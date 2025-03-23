@@ -1,0 +1,10 @@
+Encryption_Decryption/
+│── src/
+│   ├── main.py               # FastAPI main app
+│   ├── database.py           # Database connection
+│   ├── user_operations.py    # Database CRUD operations
+│   ├── models.py             # Pydantic models (New file)
+│   ├── __init__.py           # Makes `src` a package
+│── ED_Venv/                  # Virtual environment
+│── requirements.txt          # Dependencies
+│── README.md                 # Documentation

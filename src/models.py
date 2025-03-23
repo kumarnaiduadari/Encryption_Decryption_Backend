@@ -1,0 +1,21 @@
+from pydantic import BaseModel, EmailStr
+
+# Model for user creation and update
+class UserRequest(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    password: str
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+    otp: str  # Add OTP for two-factor authentication
+
+# Model for returning the QR code URL
+class TOTPSecret(BaseModel):
+    qr_url: str
+    secret: str
+
+class EmailRequest(BaseModel):
+    email: str

@@ -1,58 +1,24 @@
-import hashlib
-import time
+import win32security
 import ctypes
-from ctypes import wintypes
 
-# Load Windows Biometric Framework (WBF) API
-winbio = ctypes.WinDLL("winbio.dll")
+def authenticate_user():
+    """Attempts to authenticate the current user using Windows Hello credentials."""
+    username = ctypes.create_unicode_buffer(256)
+    ctypes.windll.advapi32.GetUserNameW(username, ctypes.byref(ctypes.c_uint32(256)))
 
-# Define constants
-WINBIO_TYPE_FINGERPRINT = 0x00000008
-WINBIO_POOL_SYSTEM = 2
-WINBIO_FLAG_DEFAULT = 0
-WINBIO_SESSION_HANDLE = wintypes.HANDLE
-WINBIO_ID_TYPE_GUID = 2
+    try:
+        token = win32security.LogonUser(
+            username.value,  # Current username
+            None,            # Domain (None for local machine)
+            None,            # No password (Windows Hello is passwordless)
+            win32security.LOGON32_LOGON_INTERACTIVE,
+            win32security.LOGON32_PROVIDER_DEFAULT
+        )
+        print("Authentication successful!")
+        return True
+    except Exception as e:
+        print(f"Authentication failed: {e}")
+        return False
 
-class WINBIO_IDENTITY(ctypes.Structure):
-    _fields_ = [("Type", wintypes.ULONG),
-                ("Value", wintypes.BYTE * 78)]
-
-def capture_fingerprint():
-    # Open a biometric session
-    session = WINBIO_SESSION_HANDLE()
-    result = winbio.WinBioOpenSession(WINBIO_TYPE_FINGERPRINT,
-                                      WINBIO_POOL_SYSTEM,
-                                      WINBIO_FLAG_DEFAULT,
-                                      None, 0, None, ctypes.byref(session))
-
-    if result != 0:
-        print("Failed to open biometric session.")
-        return None
-
-    # Capture fingerprint
-    identity = WINBIO_IDENTITY()
-    sub_factor = wintypes.ULONG()
-    reject_detail = wintypes.ULONG()
-
-    print("Place your finger on the scanner...")
-    time.sleep(2)  # Give time to place the finger
-
-    result = winbio.WinBioCaptureSample(session, WINBIO_ID_TYPE_GUID, 0, ctypes.byref(identity), ctypes.byref(sub_factor), ctypes.byref(reject_detail))
-
-    if result != 0:
-        print("Failed to capture fingerprint.")
-        return None
-
-    # Convert fingerprint data to hash
-    fingerprint_data = bytes(identity.Value)
-    fingerprint_hash = hashlib.sha256(fingerprint_data).hexdigest()
-
-    print("Fingerprint Hash:", fingerprint_hash)
-
-    # Close session
-    winbio.WinBioCloseSession(session)
-
-    return fingerprint_hash
-
-# Run the fingerprint capture
-fingerprint_hash = capture_fingerprint()
+# Run the function
+authenticate_user()

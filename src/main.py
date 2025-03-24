@@ -8,6 +8,7 @@ from src.database import db  # Ensures database is initialized when FastAPI star
 import pyotp
 import qrcode
 from fastapi.responses import Response
+from fastapi.middleware.cors import CORSMiddleware
 
 
 @asynccontextmanager
@@ -16,6 +17,15 @@ async def lifespan(app: FastAPI):
     db.close_connection()  # Runs on shutdown
 
 app = FastAPI(lifespan=lifespan)
+
+# ✅ Add CORS Middleware to allow frontend requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins (change this to frontend domain in production)
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 user_ops = UserOperations()
 

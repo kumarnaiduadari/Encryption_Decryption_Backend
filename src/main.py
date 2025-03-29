@@ -128,8 +128,6 @@ async def generate_otp_api(request: EmailRequest):
     
     return {"reference_key": reference_key}
 
-async def generate_qr():
-    return {"qr_code": "Generated QR Code URL or Data"}
 
 @app.post("/verify_otp")
 async def verify_otp_api(request: OTPVerificationRequest):
@@ -145,6 +143,6 @@ async def verify_otp_api(request: OTPVerificationRequest):
         raise HTTPException(status_code=400, detail="Invalid OTP")
     
     # OTP verified, generate QR
-    qr_response = await generate_qr()
+    qr_response = await generate_qr(EmailRequest(**{"email": request.email}))
     
     return qr_response

@@ -26,3 +26,4 @@ class EmailRequest(BaseModel):
 class OTPVerificationRequest(BaseModel):
     otp: str
     reference_key: str
+    email : EmailStr

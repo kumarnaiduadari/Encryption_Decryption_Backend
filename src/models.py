@@ -12,6 +12,9 @@ class LoginRequest(BaseModel):
     password: str
     otp: str  # Add OTP for two-factor authentication
 
+class Login_status(BaseModel):
+    email : EmailStr
+
 # Model for returning the QR code URL
 class TOTPSecret(BaseModel):
     qr_url: str

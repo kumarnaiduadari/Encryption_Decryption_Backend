@@ -58,9 +58,56 @@ class UserOperations:
         user = db.cursor.fetchone()
         
         if user:
+            update_query = "UPDATE users SET login_status = TRUE WHERE email = %s"
+            db.cursor.execute(update_query, (email,))
+            db.conn.commit()
             return {"email": user[0], "password": user[1], "totp_secret": user[2]}
         
         return None
+    
+    def logout_user(self, email):
+        """Update login_status to False when the user logs out."""
+        if not self.db.conn or not self.db.cursor:
+            raise HTTPException(status_code=500, detail="Database connection failed.")
+
+        try:
+            # Check if user exists and is logged in
+            query = "SELECT login_status FROM users WHERE email = %s"
+            self.db.cursor.execute(query, (email,))
+            user = self.db.cursor.fetchone()
+
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found.")
+
+            if not user[0]:  # If login_status is already False
+                raise HTTPException(status_code=400, detail="User is already logged out.")
+
+            # Update login_status to False
+            update_query = "UPDATE users SET login_status = FALSE WHERE email = %s"
+            self.db.cursor.execute(update_query, (email,))
+            self.db.conn.commit()
+
+            return {"message": "Logout successful"}
+        except Error as e:
+            raise HTTPException(status_code=400, detail=f"Error logging out: {e}")
+        
+    def get_login_status(self, email):
+        """Fetch the login_status of a user."""
+        if not self.db.conn or not self.db.cursor:
+            raise HTTPException(status_code=500, detail="Database connection failed.")
+
+        try:
+            query = "SELECT login_status FROM users WHERE email = %s"
+            self.db.cursor.execute(query, (email,))
+            user = self.db.cursor.fetchone()
+
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found.")
+
+            return {"email": email, "login_status": bool(user[0])}
+        except Error as e:
+            raise HTTPException(status_code=400, detail=f"Error fetching login status: {e}")
+
 
 
 

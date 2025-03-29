@@ -43,7 +43,8 @@ class MySQLDatabase:
                 last_name VARCHAR(50),
                 email VARCHAR(100) UNIQUE,
                 password VARCHAR(255),
-                totp_secret VARCHAR(32)
+                totp_secret VARCHAR(32),
+                login_status BOOLEAN DEFAULT FALSE
             );
             """
             self.cursor.execute(create_table_query)

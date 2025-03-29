@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from passlib.context import CryptContext
 from contextlib import asynccontextmanager
-from src.models import UserRequest, LoginRequest, TOTPSecret , EmailRequest # Importing models
+from src.models import UserRequest, LoginRequest, TOTPSecret , EmailRequest , Login_status# Importing models
 from src.user_operations import UserOperations
 import src.user_operations
 from src.database import db  # Ensures database is initialized when FastAPI starts
@@ -72,3 +72,13 @@ async def generate_qr(request: EmailRequest):
 
     response = Response(content=img_bytes.tobytes(), media_type="image/png")
     return {"qr_url": otp_uri, "secret": totp_secret}
+
+@app.post("/logout")
+async def logout(user: Login_status):
+    """API endpoint to log out a user by setting login_status to False."""
+    return user_ops.logout_user(user.email)
+
+@app.post("/login-status")
+async def get_login_status(request: Login_status):
+    """API endpoint to get a user's login status."""
+    return user_ops.get_login_status(request.email)

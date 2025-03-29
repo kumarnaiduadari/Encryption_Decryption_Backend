@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from passlib.context import CryptContext
 from contextlib import asynccontextmanager
-from src.models import UserRequest, LoginRequest, TOTPSecret , EmailRequest , Login_status, OTPVerificationRequest# Importing models
+from src.models import UserRequest, LoginRequest, TOTPSecret , EmailRequest , Login_status, OTPVerificationRequest, UpdatePasswordRequest
 from src.user_operations import UserOperations
 import src.user_operations
 from src.database import db  # Ensures database is initialized when FastAPI starts
@@ -129,7 +129,7 @@ async def generate_otp_api(request: EmailRequest):
     return {"reference_key": reference_key}
 
 
-@app.post("/verify_otp")
+@app.post("/verify_otp_qr")
 async def verify_otp_api(request: OTPVerificationRequest):
     data = otp_storage.get(request.reference_key)
     if not data:
@@ -146,3 +146,23 @@ async def verify_otp_api(request: OTPVerificationRequest):
     qr_response = await generate_qr(EmailRequest(**{"email": request.email}))
     
     return qr_response
+
+@app.post("/verify_otp_fp")
+async def verify_otp_api(request: OTPVerificationRequest):
+    data = otp_storage.get(request.reference_key)
+    if not data:
+        raise HTTPException(status_code=400, detail="Invalid reference key")
+    
+    # Check if OTP is expired (valid for 2 minutes)
+    if time.time() - data["timestamp"] > 120:
+        raise HTTPException(status_code=400, detail="OTP expired")
+    
+    if data["otp"] != request.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    
+    return {"Ötp Verification status": "True"}
+
+@app.post("/update_password")
+async def update_password(request: UpdatePasswordRequest):
+    """API endpoint to update user password."""
+    return user_ops.update_password(request.email, request.new_password)

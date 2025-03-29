@@ -27,3 +27,7 @@ class OTPVerificationRequest(BaseModel):
     otp: str
     reference_key: str
     email : EmailStr
+
+class UpdatePasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str

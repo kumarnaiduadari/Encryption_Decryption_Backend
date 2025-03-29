@@ -107,6 +107,27 @@ class UserOperations:
             return {"email": email, "login_status": bool(user[0])}
         except Error as e:
             raise HTTPException(status_code=400, detail=f"Error fetching login status: {e}")
+        
+    def update_password(self, email, new_password):
+        """Update user password securely."""
+        if not self.db.conn or not self.db.cursor:
+            raise HTTPException(status_code=500, detail="Database connection failed.")
+
+        try:
+            # Hash the new password before storing it
+            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            hashed_password = pwd_context.hash(new_password)
+
+            update_query = "UPDATE users SET password = %s WHERE email = %s;"
+            self.db.cursor.execute(update_query, (hashed_password, email))
+            self.db.conn.commit()
+
+            if self.db.cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="User not found.")
+
+            return {"message": "Password updated successfully."}
+        except Error as e:
+            raise HTTPException(status_code=400, detail=f"Error updating password: {e}")
 
 
 

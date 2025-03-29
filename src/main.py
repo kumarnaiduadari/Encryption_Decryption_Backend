@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from passlib.context import CryptContext
 from contextlib import asynccontextmanager
-from src.models import UserRequest, LoginRequest, TOTPSecret , EmailRequest , Login_status# Importing models
+from src.models import UserRequest, LoginRequest, TOTPSecret , EmailRequest , Login_status, OTPVerificationRequest# Importing models
 from src.user_operations import UserOperations
 import src.user_operations
 from src.database import db  # Ensures database is initialized when FastAPI starts
@@ -9,7 +9,15 @@ import pyotp
 import qrcode
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
+import random
+import string
+import yagmail
+import uuid
+import time, logging
+from typing import Dict
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -82,3 +90,61 @@ async def logout(user: Login_status):
 async def get_login_status(request: Login_status):
     """API endpoint to get a user's login status."""
     return user_ops.get_login_status(request.email)
+
+def generate_otp():
+    return ''.join(random.choices(string.digits, k=6))
+
+def send_email(email: str, otp: str, reference_key: str):
+    sender_email = "idoican80@gmail.com"
+    password = "pbqloirhdnnviaal"
+    yag = yagmail.SMTP(user=sender_email, password=password)
+    subject = "Login OTP Verification"
+    body = f"Your OTP is {otp}. Reference Key: {reference_key}"
+    yag.send(to=email, subject=subject, contents=body)
+
+
+otp_storage: Dict[str, Dict[str, str | float]] = {}
+
+@app.post("/generate_otp")
+async def generate_otp_api(request: EmailRequest):
+    logger.info(f"Received OTP generation request for email: {request.email}")
+    try:
+        db_user = user_ops.get_user_by_email(request.email)
+        if not db_user:
+            logger.warning(f"User not found: {request.email}")
+            raise HTTPException(status_code=404, detail="User not found")
+    except Exception as e:
+        logger.error(f"Database error for {request.email}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    
+    otp = generate_otp()
+    reference_key = str(uuid.uuid4())
+    timestamp = time.time()
+    
+    otp_storage[reference_key] = {"otp": otp, "email": request.email, "timestamp": timestamp}
+    logger.info(f"Generated OTP {otp} for email {request.email} with reference key {reference_key}")
+    
+    send_email(request.email, otp, reference_key)
+    
+    return {"reference_key": reference_key}
+
+async def generate_qr():
+    return {"qr_code": "Generated QR Code URL or Data"}
+
+@app.post("/verify_otp")
+async def verify_otp_api(request: OTPVerificationRequest):
+    data = otp_storage.get(request.reference_key)
+    if not data:
+        raise HTTPException(status_code=400, detail="Invalid reference key")
+    
+    # Check if OTP is expired (valid for 2 minutes)
+    if time.time() - data["timestamp"] > 120:
+        raise HTTPException(status_code=400, detail="OTP expired")
+    
+    if data["otp"] != request.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    
+    # OTP verified, generate QR
+    qr_response = await generate_qr()
+    
+    return qr_response

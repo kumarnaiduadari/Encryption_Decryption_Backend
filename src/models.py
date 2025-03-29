@@ -22,3 +22,7 @@ class TOTPSecret(BaseModel):
 
 class EmailRequest(BaseModel):
     email: str
+
+class OTPVerificationRequest(BaseModel):
+    otp: str
+    reference_key: str

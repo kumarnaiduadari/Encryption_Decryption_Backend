@@ -3,6 +3,14 @@ from fastapi import HTTPException
 from mysql.connector import Error
 from passlib.context import CryptContext
 import pyotp
+import gzip
+import os
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+import base64
+import secrets
 
 class UserOperations:
     def __init__(self):
@@ -128,6 +136,79 @@ class UserOperations:
             return {"message": "Password updated successfully."}
         except Error as e:
             raise HTTPException(status_code=400, detail=f"Error updating password: {e}")
+        
+
+        # Global AES Key (Should be stored securely)
+    GLOBAL_KEY = b'supersecureglobalkey16'
+
+    def derive_key(self, secret: str):
+        """Derives a 256-bit AES key from the given secret."""
+        salt = b'static_salt_value'  # Use a secure random salt in production
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+            backend=default_backend()
+        )
+        return kdf.derive(secret.encode())
+
+    def aes_encrypt(self, data: bytes, key: str) -> bytes:
+        """Encrypts data using AES-256."""
+        
+        # Ensure key is converted to bytes and is exactly 32 bytes long
+        key = key.encode()  # Convert string to bytes
+        key = key.ljust(32, b'\0')[:32]  # Ensure key is exactly 32 bytes
+
+        iv = secrets.token_bytes(16)  # Generate a 16-byte IV
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+
+        # Apply PKCS7 padding to make data a multiple of 16 bytes
+        padding_length = 16 - (len(data) % 16)
+        data += bytes([padding_length] * padding_length)
+
+        # Encrypt data and prepend IV for decryption
+        return iv + encryptor.update(data) + encryptor.finalize()
+
+    def aes_decrypt(self, encrypted_data: bytes, key: bytes) -> bytes:
+        """Decrypt data using AES (CBC mode)"""
+         # Ensure key is converted to bytes and is exactly 32 bytes long
+        key = key.encode()  # Convert string to bytes
+        key = key.ljust(32, b'\0')[:32]  # Ensure key is exactly 32 bytes
+
+        # Extract IV (first 16 bytes)
+        iv = encrypted_data[:16]
+        ciphertext = encrypted_data[16:]
+
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_padded = decryptor.update(ciphertext) + decryptor.finalize()
+
+        # Remove padding (assuming PKCS7 padding)
+        pad_len = decrypted_padded[-1]
+        decrypted_data = decrypted_padded[:-pad_len]
+        
+        return decrypted_data
+
+    def compress_data(self, data: bytes):
+        """Compress data using gzip."""
+        return gzip.compress(data)
+
+    def decompress_data(self, data: bytes):
+        """Decompress gzip data."""
+        return gzip.decompress(data)
+    
+    def get_top_secret(self, email):
+        """Fetch the user's top_secret from the database using email."""
+        query = "SELECT totp_secret FROM users WHERE email = %s"
+        self.db.cursor.execute(query, (email,))
+        user = self.db.cursor.fetchone()
+
+        if user:
+            return user[0]
+        
+        raise HTTPException(status_code=404, detail="User not found")
 
 
 

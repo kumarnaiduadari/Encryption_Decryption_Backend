@@ -21,7 +21,7 @@ class TOTPSecret(BaseModel):
     secret: str
 
 class EmailRequest(BaseModel):
-    email: str
+    email: EmailStr
 
 class OTPVerificationRequest(BaseModel):
     otp: str
@@ -31,3 +31,10 @@ class OTPVerificationRequest(BaseModel):
 class UpdatePasswordRequest(BaseModel):
     email: EmailStr
     new_password: str
+
+class TextEncryptionRequest(BaseModel):
+    email: EmailStr
+    text: str
+
+class TextDecryptionRequest(BaseModel):
+    encrypted_text: str

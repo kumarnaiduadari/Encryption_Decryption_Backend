@@ -11,6 +11,9 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 import base64
 import secrets
+import logging
+
+logger = logging.getLogger(__name__)
 
 class UserOperations:
     def __init__(self):
@@ -155,7 +158,7 @@ class UserOperations:
 
     def aes_encrypt(self, data: bytes, key: str) -> bytes:
         """Encrypts data using AES-256."""
-        
+
         # Ensure key is converted to bytes and is exactly 32 bytes long
         key = key.encode()  # Convert string to bytes
         key = key.ljust(32, b'\0')[:32]  # Ensure key is exactly 32 bytes
@@ -166,20 +169,25 @@ class UserOperations:
 
         # Apply PKCS7 padding to make data a multiple of 16 bytes
         padding_length = 16 - (len(data) % 16)
-        data += bytes([padding_length] * padding_length)
+        padding = bytes([padding_length] * padding_length)
+        padded_data = data + padding
+
+        logger.info(f"Encrypting data: Original length = {len(data)}, Padded length = {len(padded_data)}")
 
         # Encrypt data and prepend IV for decryption
-        return iv + encryptor.update(data) + encryptor.finalize()
+        return iv + encryptor.update(padded_data) + encryptor.finalize()
 
     def aes_decrypt(self, encrypted_data: bytes, key: bytes) -> bytes:
         """Decrypt data using AES (CBC mode)"""
-         # Ensure key is converted to bytes and is exactly 32 bytes long
+        # Ensure key is converted to bytes and is exactly 32 bytes long
         key = key.encode()  # Convert string to bytes
         key = key.ljust(32, b'\0')[:32]  # Ensure key is exactly 32 bytes
 
         # Extract IV (first 16 bytes)
         iv = encrypted_data[:16]
         ciphertext = encrypted_data[16:]
+
+        logger.info(f"Decrypting data: Ciphertext length = {len(ciphertext)}")
 
         cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
         decryptor = cipher.decryptor()
@@ -188,8 +196,11 @@ class UserOperations:
         # Remove padding (assuming PKCS7 padding)
         pad_len = decrypted_padded[-1]
         decrypted_data = decrypted_padded[:-pad_len]
-        
+
+        logger.info(f"Decrypted data length (after padding removal) = {len(decrypted_data)}")
+
         return decrypted_data
+
 
     def compress_data(self, data: bytes):
         """Compress data using gzip."""

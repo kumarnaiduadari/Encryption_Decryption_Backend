@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Form
+from fastapi import FastAPI, HTTPException, Form, Query
 from passlib.context import CryptContext
 from contextlib import asynccontextmanager
 from src.models import UserRequest, LoginRequest, TOTPSecret , EmailRequest , Login_status, OTPVerificationRequest, UpdatePasswordRequest, TextEncryptionRequest, TextDecryptionRequest
@@ -6,6 +6,7 @@ from src.user_operations import UserOperations
 import src.user_operations
 from src.database import db  # Ensures database is initialized when FastAPI starts
 import pyotp
+from fastapi.responses import JSONResponse
 import qrcode
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -217,13 +218,11 @@ async def encrypt_file(email: str = Form(...), file: UploadFile = File(...)):
 
     return {"message": "File encrypted successfully", "file_path": encrypted_file_path}
 
-
-# Define the base directory for decrypted files
 DECRYPTED_FILES_DIR = os.path.abspath("decrypted_files")
-
+# Define the base directory for decrypted files
 @router.post("/decrypt")
 async def decrypt_file(file: UploadFile = File(...)):
-    """Decrypts a file and returns it in the same format."""
+    """Decrypts a file and returns the file path in JSON response."""
     
     logger.info(f"🔹 Received file for decryption: {file.filename}")
 
@@ -243,7 +242,7 @@ async def decrypt_file(file: UploadFile = File(...)):
         logger.info(f"✅ Extracted email from header: {email}")
     except ValueError:
         logger.error("❌ Failed to extract email from decrypted data.")
-        return {"error": "Invalid encrypted file format."}
+        raise HTTPException(status_code=400, detail="Invalid encrypted file format.")
 
     # 🔹 Step 4: Decrypt with User's top_secret
     user_top_secret = user_ops.get_top_secret(email)
@@ -266,7 +265,7 @@ async def decrypt_file(file: UploadFile = File(...)):
     
     logger.info(f"✅ Decrypted file saved at: {decrypted_file_path}")
 
-    return FileResponse(decrypted_file_path, filename=original_filename, media_type=file.content_type)
+    return JSONResponse(content={"message": "File decrypted successfully", "file_path": decrypted_file_path})
 
 @router.post("/encrypt_text")
 def encrypt_text(request: TextEncryptionRequest):
@@ -310,6 +309,18 @@ def decrypt_text(request: TextDecryptionRequest):
         return {"email": email, "decrypted_text": original_text}
     except Exception as e:
         return {"error": str(e)}
+    
+@router.get("/download")
+async def download_file(file_path: str = Query(...)):
+    """Downloads a file from the given file path."""
+    logging.info(f"Received download request for file: {file_path}")
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    filename = os.path.basename(file_path) # get filename.
+
+    return FileResponse(file_path, filename=filename)
 
 
 

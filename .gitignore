@@ -1,3 +1,5 @@
 ED_Venv/
 __pycache__/
 *.pyc
+decrypted_files/
+encrypted_files/

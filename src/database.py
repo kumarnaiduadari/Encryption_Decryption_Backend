@@ -62,4 +62,4 @@ class MySQLDatabase:
             print("🔌 MySQL connection closed.")
 
 # Automatically initialize database when this module is imported
-db = MySQLDatabase(host="localhost", user="root", password="12shroot", database="encryption_decryption")
+db = MySQLDatabase(host="localhost", user="root", password="root", database="encryption_decryption")

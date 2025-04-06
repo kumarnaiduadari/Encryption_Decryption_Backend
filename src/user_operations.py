@@ -36,6 +36,19 @@ class UserOperations:
 
         return None
 
+    def get_user_by_emailid(self, email):
+        """Fetch user details by email."""
+        query = "SELECT first_name, last_name FROM users WHERE email = %s"
+        db.cursor.execute(query, (email,))
+        user = db.cursor.fetchone()
+
+        if user:
+            first_name = user['first_name'].title()
+            last_name = user['last_name'].title()
+            return f"{first_name} {last_name}"
+
+        return None
+
     def add_user(self, first_name: str, last_name: str, email: str, password: str) -> dict:
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

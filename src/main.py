@@ -29,6 +29,7 @@ from src.models import (
 from src.user_operations import UserOperations
 from src.webauthn_routes import router as webauthn_router
 from starlette.middleware.sessions import SessionMiddleware
+from src.core.email_service import EmailTemplateManager
 
 
 
@@ -127,10 +128,21 @@ def generate_otp():
 def send_email(email: str, otp: str, reference_key: str):
     sender_email = "idoican80@gmail.com"
     password = "pbqloirhdnnviaal"
+    full_name = user_ops.get_user_by_emailid(email)
     yag = yagmail.SMTP(user=sender_email, password=password)
-    subject = "Login OTP Verification"
-    body = f"Your OTP is {otp}. Reference Key: {reference_key}"
-    yag.send(to=email, subject=subject, contents=body)
+    subject = "Your Secure Login Verification Code | ED-App"
+    email_manager = EmailTemplateManager()
+    body = email_manager.render_verification_email({
+        "full_name": full_name,
+        "otp": otp,
+        "reference_key": reference_key
+    })
+    yag.send(
+        to=email,
+        subject=subject,
+        contents=body,
+        headers={"Content-Type": "text/html"}
+    )
 
 
 @app.post("/generate_otp")

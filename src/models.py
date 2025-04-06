@@ -38,3 +38,25 @@ class TextEncryptionRequest(BaseModel):
 
 class TextDecryptionRequest(BaseModel):
     encrypted_text: str
+
+
+# Request models
+class RegisterRequest(BaseModel):
+    username: str
+
+
+class VerifyRegisterRequest(BaseModel):
+    username: str
+    credential: dict
+    challenge: str
+
+
+class AuthenticateRequest(BaseModel):
+    username: str
+
+
+class VerifyAuthenticateRequest(BaseModel):
+    username: str
+    credential: dict
+    challenge: str
+

@@ -3,7 +3,7 @@ import logging
 import random
 import string
 import uuid
-
+import hashlib
 # Third-party Imports
 import pyotp
 import qrcode
@@ -30,11 +30,17 @@ from src.user_operations import UserOperations
 from src.webauthn_routes import router as webauthn_router
 from starlette.middleware.sessions import SessionMiddleware
 from src.core.email_service import EmailTemplateManager
-
+from datetime import datetime, timedelta
+import jwt
+from fastapi import Response, Request
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+SECRET_KEY = "your-32-character-secret-key-1234567890"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
 
 
 @asynccontextmanager
@@ -47,15 +53,6 @@ async def lifespan(app: FastAPI):
     db.close_connection()  # Your existing cleanup
 
 app = FastAPI(lifespan=lifespan)
-
-app.add_middleware(
-    SessionMiddleware,
-    secret_key="your-32-char-secret-key",  # Must be 32 chars!
-    session_cookie="session_cookie",
-    https_only=True,     # Only send cookie over HTTPS
-    same_site="lax",     # Prevent CSRF
-    max_age=3600         # 1 hour expiration
-)
 
 app.add_middleware(
     CORSMiddleware,
@@ -77,7 +74,7 @@ async def add_user(user: UserRequest):
     return user_ops.add_user(user.first_name, user.last_name, user.email, user.password)
 
 @app.post("/login")
-async def login(user: LoginRequest):
+async def login(user: LoginRequest, response: Response):
     """API endpoint to verify user login credentials with 2FA."""
     db_user = user_ops.get_user_by_email(user.email)
     if not db_user:
@@ -91,7 +88,43 @@ async def login(user: LoginRequest):
     if not totp.verify(user.otp):
         raise HTTPException(status_code=401, detail="Invalid OTP")
 
+        # Generate JWT token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = jwt.encode(
+        {
+            "sub": user.email,
+            "exp": datetime.utcnow() + access_token_expires
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
+
+    # Set HTTP-only cookie
+    response.set_cookie(
+        key="session_token",
+        value=access_token,
+        httponly=True,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        secure=True,  # In production
+        samesite="Lax"
+    )
+
     return {"message": "Login successful"}
+
+
+@app.get("/validate_session")
+async def validate_session(request: Request):
+    token = request.cookies.get("session_token")
+    if not token:
+        return {"authenticated": False}
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return {"authenticated": True, "email": payload["sub"]}
+    except jwt.ExpiredSignatureError:
+        return {"authenticated": False, "reason": "Token expired"}
+    except jwt.InvalidTokenError:
+        return {"authenticated": False, "reason": "Invalid token"}
 
 @app.post("/generate_qr")
 async def generate_qr(request: EmailRequest):
@@ -111,9 +144,14 @@ async def generate_qr(request: EmailRequest):
     return {"qr_url": otp_uri, "secret": totp_secret}
 
 @app.post("/logout")
-async def logout(user: Login_status):
-    """API endpoint to log out a user by setting login_status to False."""
-    return user_ops.logout_user(user.email)
+async def logout(response: Response):
+    response.delete_cookie(
+        key="session_token",
+        httponly=True,
+        secure=True,
+        samesite="Lax"
+    )
+    return {"message": "Logged out successfully"}
 
 @app.post("/login-status")
 async def get_login_status(request: Login_status):
@@ -219,4 +257,18 @@ async def get_user_full_name_api(request: EmailRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/current_user")
+async def get_current_user(request: Request):
+    token = request.cookies.get("session_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        print(f"email : {payload["sub"]}")
+        return {"email": payload["sub"]}
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
